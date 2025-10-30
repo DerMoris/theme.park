@@ -8,6 +8,12 @@ from hashlib import md5
 
 chdir(dirname(abspath(__file__))) # Set working dir
 
+# Cache for MD5 hashes to avoid repeated file reads
+_hash_cache = {}
+
+# Cache getcwd() result as it's called thousands of times
+_cwd = None
+
 def get_shas(output) -> dict[str, str]:
     """Returns a dict of CSS files and SHAs"""
     output_lines = output.splitlines() if output else []
@@ -21,12 +27,25 @@ def get_shas(output) -> dict[str, str]:
 
 
 def get_md5_hash(file_path) -> str:
-    """Returns the MD5 hash of a file"""
+    """Returns the MD5 hash of a file with caching"""
+    # Use cache to avoid re-reading the same file multiple times
+    if file_path in _hash_cache:
+        return _hash_cache[file_path]
+    
     md5_hash = md5()
     with open(file_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
             md5_hash.update(byte_block)
-    return md5_hash.hexdigest()
+    result = md5_hash.hexdigest()
+    _hash_cache[file_path] = result
+    return result
+
+def get_cached_cwd() -> str:
+    """Returns cached current working directory"""
+    global _cwd
+    if _cwd is None:
+        _cwd = getcwd()
+    return _cwd
 
 def create_addons_json() -> str:
     #addon_shas = subprocess.check_output(["git", "ls-files", "-s", "./css/addons/*.css"]) if isdir(".git") else []
@@ -43,33 +62,42 @@ def create_addons_json() -> str:
             }
         })
         for addon in app_addons:
-            files = [file for file in listdir(
-                f"{addon_root}/{app}/{addon}") if isfile(join(f"{addon_root}/{app}/{addon}", file))]
-            if len([f for f in files if f.endswith('.css')]) > 1:
+            addon_path = f"{addon_root}/{app}/{addon}"
+            files = [file for file in listdir(addon_path) if isfile(join(addon_path, file))]
+            
+            # Split files into CSS and non-CSS once
+            css_files = [f for f in files if f.endswith('.css')]
+            non_css_files = [f for f in files if not f.endswith('.css')]
+            
+            if len(css_files) > 1:
                 ADDONS["addons"][app][addon].update({
-                    "css":  [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(getcwd(),'css','addons',app,addon,file))}" for file in files if file.split(".")[1] == "css"]
+                    "css":  [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(get_cached_cwd(),'css','addons',app,addon,file))}" for file in css_files]
                 }
                 )
             else:
-                if len([f for f in files if not f.endswith('.css')]) >= 1:
+                if non_css_files:
                     ADDONS["addons"][app][addon].update({
-                        "files":  [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(getcwd(),'css','addons',app,addon,file))}" for file in files]
+                        "files":  [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(get_cached_cwd(),'css','addons',app,addon,file))}" for file in files]
                     }
                     )
                 ADDONS["addons"][app].update({
-                    addon:  f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(getcwd(),'css','addons',app,addon,file))}" for file in files if file.split(".")[1] == "css"
+                    addon:  f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{file}?sha={get_md5_hash(join(get_cached_cwd(),'css','addons',app,addon,file))}" for file in css_files
                 }
                 )
-            extra_dirs = [dir for dir in listdir(
-                f"{addon_root}/{app}/{addon}") if isdir(join(f"{addon_root}/{app}/{addon}", dir))]
+            extra_dirs = [dir for dir in listdir(addon_path) if isdir(join(addon_path, dir))]
             if extra_dirs:
                 for dir in extra_dirs:
-                    extra_dir_files = [file for file in listdir(
-                        f"{addon_root}/{app}/{addon}/{dir}") if isfile(join(f"{addon_root}/{app}/{addon}/{dir}", file))]
+                    extra_dir_path = f"{addon_path}/{dir}"
+                    extra_dir_files = [file for file in listdir(extra_dir_path) if isfile(join(extra_dir_path, file))]
+                    
+                    # Split extra dir files into CSS and non-CSS
+                    extra_css_files = [f for f in extra_dir_files if f.endswith('.css')]
+                    extra_non_css_files = [f for f in extra_dir_files if not f.endswith('.css')]
+                    
                     ADDONS["addons"][app][addon].update({
                         dir: {
-                            "css": [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{dir}/{extra_file}?sha={get_md5_hash(join(getcwd(),'css','addons',app,addon,dir,extra_file))}" for extra_file in extra_dir_files if extra_file.split(".")[1] == "css"],
-                            "files": [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{dir}/{extra_file}?sha={get_md5_hash(join(getcwd(),'css','addons',app,addon,dir,extra_file))}" for extra_file in extra_dir_files if extra_file.split(".")[1] != "css"]
+                            "css": [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{dir}/{extra_file}?sha={get_md5_hash(join(get_cached_cwd(),'css','addons',app,addon,dir,extra_file))}" for extra_file in extra_css_files],
+                            "files": [f"{scheme}://{DOMAIN}/css/addons/{app}/{addon}/{dir}/{extra_file}?sha={get_md5_hash(join(get_cached_cwd(),'css','addons',app,addon,dir,extra_file))}" for extra_file in extra_non_css_files]
                         },
                     }
                     )
@@ -85,12 +113,12 @@ def create_json(app_folders: list = None, themes: list = None, community_themes:
         #COMMUNITY_THEME_SHAS = get_shas(community_theme_shas)
         THEMES = {
                 theme.split(".")[0].capitalize(): {
-                    "url": f"{scheme}://{DOMAIN}/css/theme-options/{theme}?sha={get_md5_hash(join(getcwd(),'css','theme-options', theme))}"
+                    "url": f"{scheme}://{DOMAIN}/css/theme-options/{theme}?sha={get_md5_hash(join(get_cached_cwd(),'css','theme-options', theme))}"
                 }for theme in themes if themes
             }
         COMMUNITY_THEMES = {
                 theme.split(".")[0].capitalize(): {
-                    "url": f"{scheme}://{DOMAIN}/css/community-theme-options/{theme}?sha={get_md5_hash(join(getcwd(),'css','community-theme-options', theme))}"
+                    "url": f"{scheme}://{DOMAIN}/css/community-theme-options/{theme}?sha={get_md5_hash(join(get_cached_cwd(),'css','community-theme-options', theme))}"
                 }for theme in community_themes if community_themes
             }
         THEMES_DICT.update(dict(sorted({
@@ -143,21 +171,46 @@ def create_theme_options() -> None:
     #THEME_SHAS = get_shas(theme_shas)
     #COMMUNITY_THEME_SHAS = get_shas(community_theme_shas)
     #APP_SHAS = get_shas(app_shas)
-    def create_css(theme, theme_type="standard"):
-        folder = "./css/base"
-        with open(f"{folder}/{app}/{theme.lower()}.css", "w") as create_app:
-            content = f'@import url("/css/base/{app}/{app}-base.css?sha={get_md5_hash(join(getcwd(),"css","base",app,f"{app}-base.css"))}");\n@import url("/css/{"theme-options" if theme_type=="standard" else "community-theme-options"}/{theme.lower()}.css?sha={get_md5_hash(join(getcwd(),"css","theme-options",f"{theme.lower()}.css")) if theme_type=="standard" else get_md5_hash(join(getcwd(),"css","community-theme-options",f"{theme.lower()}.css"))}");'
-            create_app.write(content)
-    with open("themes.json") as themes:
-        data = load(themes)
+    
+    with open("themes.json") as themes_file:
+        data = load(themes_file)
         themes = data["themes"]
         community_themes = data["community-themes"]
         applications = data["applications"]
+    
+    # Pre-compute theme hashes once instead of for every app
+    cwd = get_cached_cwd()
+    theme_hashes = {}
+    for theme_name in themes:
+        theme_lower = theme_name.lower()
+        theme_path = join(cwd, "css", "theme-options", f"{theme_lower}.css")
+        theme_hashes[theme_lower] = get_md5_hash(theme_path)
+    
+    community_theme_hashes = {}
+    for theme_name in community_themes:
+        theme_lower = theme_name.lower()
+        theme_path = join(cwd, "css", "community-theme-options", f"{theme_lower}.css")
+        community_theme_hashes[theme_lower] = get_md5_hash(theme_path)
+    
+    folder = "./css/base"
     for app in applications:
-        for theme in themes:
-            create_css(theme)
-        for theme in community_themes:
-            create_css(theme,theme_type="community")
+        # Pre-compute app base hash once instead of for every theme
+        app_base_path = join(cwd, "css", "base", app, f"{app}-base.css")
+        app_base_hash = get_md5_hash(app_base_path)
+        
+        # Create standard theme CSS files
+        for theme_name in themes:
+            theme_lower = theme_name.lower()
+            content = f'@import url("/css/base/{app}/{app}-base.css?sha={app_base_hash}");\n@import url("/css/theme-options/{theme_lower}.css?sha={theme_hashes[theme_lower]}");\n'
+            with open(f"{folder}/{app}/{theme_lower}.css", "w") as create_app:
+                create_app.write(content)
+        
+        # Create community theme CSS files
+        for theme_name in community_themes:
+            theme_lower = theme_name.lower()
+            content = f'@import url("/css/base/{app}/{app}-base.css?sha={app_base_hash}");\n@import url("/css/community-theme-options/{theme_lower}.css?sha={community_theme_hashes[theme_lower]}");\n'
+            with open(f"{folder}/{app}/{theme_lower}.css", "w") as create_app:
+                create_app.write(content)
 
 scheme = env.get('TP_SCHEME','https') if env.get('TP_SCHEME') else 'https'
 
