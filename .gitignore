@@ -1,3 +1,12 @@
 .vscode/*
-venv*/__pycache__/
+venv*/
+__pycache__/
 *.pyc
+
+# Generated files (created by themes.py, deployed via CI/CD to live branches)
+themes.json
+
+# Generated CSS files in css/base/*/
+# Keep *-base.css files, ignore all other CSS files
+css/base/*/*.css
+!css/base/*/*-base.css
