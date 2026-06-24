@@ -208,9 +208,9 @@
         "mosystems": {
           "css": [],
           "files": [
-            "https://github.local/css/addons/unraid/login-page/mosystems/ikarus.png?sha=744ea09d2327a8ced2c0bcbc1dc75502",
-            "https://github.local/css/addons/unraid/login-page/mosystems/arche.png?sha=84fbf6cc5a9ec363b05ba9246b05333f",
-            "https://github.local/css/addons/unraid/login-page/mosystems/hemlock.png?sha=a763da217fb217d57271f9197c7bd047"
+            "https://github.local/css/addons/unraid/login-page/mosystems/ikarus.png?sha=646799768dbf77d84e26c554e659fae8",
+            "https://github.local/css/addons/unraid/login-page/mosystems/arche.png?sha=4b0103cae59660f1910c9989260c34ad",
+            "https://github.local/css/addons/unraid/login-page/mosystems/hemlock.png?sha=4ca968431212c29320d8a444db524d6e"
           ]
         },
         "retro-terminal": {
@@ -756,9 +756,9 @@
           "mosystems": {
             "css": [],
             "files": [
-              "https://github.local/css/addons/unraid/login-page/mosystems/ikarus.png?sha=744ea09d2327a8ced2c0bcbc1dc75502",
-              "https://github.local/css/addons/unraid/login-page/mosystems/arche.png?sha=84fbf6cc5a9ec363b05ba9246b05333f",
-              "https://github.local/css/addons/unraid/login-page/mosystems/hemlock.png?sha=a763da217fb217d57271f9197c7bd047"
+              "https://github.local/css/addons/unraid/login-page/mosystems/ikarus.png?sha=646799768dbf77d84e26c554e659fae8",
+              "https://github.local/css/addons/unraid/login-page/mosystems/arche.png?sha=4b0103cae59660f1910c9989260c34ad",
+              "https://github.local/css/addons/unraid/login-page/mosystems/hemlock.png?sha=4ca968431212c29320d8a444db524d6e"
             ]
           },
           "retro-terminal": {
